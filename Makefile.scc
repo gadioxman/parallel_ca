@@ -1,0 +1,22 @@
+SHELL=sh
+RCCEROOT=../..
+include $(RCCEROOT)/common/symbols
+
+EXTRACFLAGS = -DNUM_STEPS=100 -DNUM_TILES=2 -DSCC_PLATFORM -std=gnu99
+LIFEOBJS=life.o utility.o $(ARCHIVE) 
+
+default:
+	@echo "Usage: make API=gory  life"
+	@echo "       make           clean"
+
+life: $(LIFEOBJS) life.h utility.h
+	$(CCOMPILE) -o life $(LIFEOBJS) $(CFLAGS) $(EXTRACFLAGS)
+
+life.o: life.c $(RCCEINCLUDE)/RCCE.h life.h utility.h
+	$(CCOMPILE) -c $(CFLAGS)  $(EXTRACFLAGS) life.c  
+
+utility.o: utility.c $(RCCEINCLUDE)/RCCE.h utility.h life.h
+	$(CCOMPILE) -c $(CFLAGS)  $(EXTRACFLAGS) utility.c
+
+clean:
+	@ rm -f *.o life __*__* linker.map *.txt *.s

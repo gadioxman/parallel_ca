@@ -1,0 +1,86 @@
+# This is a -*- Makefile -*-
+
+# Default target.
+all:
+
+ifndef TILERA_ROOT
+$(error The 'TILERA_ROOT' environment variable is not set.)
+endif
+
+BIN = $(TILERA_ROOT)/bin/
+
+CC = $(BIN)tile-cc
+CFLAGS = -std=gnu99 -O3 -Wall -DNUM_STEPS=1000000 -DNUM_TILES=48 -DTILERA_PLATFORM -pthread
+
+TILE_MONITOR = $(BIN)tile-monitor
+
+EXECUTABLE = life
+
+# command line parameters
+#
+# 1: number of tiles
+# 2: number of steps
+# 3: input.txt or random for random generated data
+# 4: output file
+# 5: algorithm
+MONITOR_COMMON_ARGS = \
+  --batch-mode \
+  --mkdir /opt/test \
+  --cd /opt/test \
+  --upload $(EXECUTABLE) $(EXECUTABLE) \
+  --here \
+  --hvx dataplane=0-61 \
+  -- $(EXECUTABLE) 48 96 random output.txt 0
+
+# For faster execution, also specify the "--functional" option to run
+# the simulator in functional mode, as opposed to the default
+# timing-accurate mode.
+SIMULATOR_ARGS = \
+  --image tile64 \
+  --tile 8x8 \
+  --functional \
+  --sim-args -+- --output-file ttv -+-
+#  --sim-args -+- --trace-tile-view ttv -+-
+#  --sim-args -+- --trace-router --output-file ttv -+-
+
+PCI_ARGS = \
+  --pci \
+  --hvc my.hvc \
+  --tile 8x8
+
+FILTER = sort | sed 's/tile [0-9]*:/tile N:/'
+
+life.o: life.c life.h utility.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+utility.o: utility.c life.h utility.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+life: life.o utility.o
+	$(CC) $(LDFLAGS) life.o utility.o -pthread -ltmc -o $@
+
+all: $(EXECUTABLE)
+
+clean:
+	rm -f *.o $(EXECUTABLE)
+
+
+run run_sim: $(EXECUTABLE)
+	$(TILE_MONITOR) $(SIMULATOR_ARGS) $(MONITOR_COMMON_ARGS)
+
+test test_sim: $(EXECUTABLE)
+	set -e -o pipefail; \
+	$(TILE_MONITOR) $(SIMULATOR_ARGS) $(MONITOR_COMMON_ARGS) \
+	  | $(FILTER) > output.run; \
+	cat output.txt | $(FILTER) | diff output.run -
+
+run_pci: $(EXECUTABLE)
+	$(TILE_MONITOR) $(PCI_ARGS) $(MONITOR_COMMON_ARGS)
+
+test_pci: $(EXECUTABLE)
+	set -e -o pipefail; \
+	$(TILE_MONITOR) $(PCI_ARGS) $(MONITOR_COMMON_ARGS) \
+	  | $(FILTER) > output.run; \
+	cat output.txt | $(FILTER) | diff output.run -
+
+.PHONY: all clean run run_sim test test_sim run_pci test_pci

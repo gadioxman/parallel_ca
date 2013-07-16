@@ -1,0 +1,17 @@
+all: life
+
+CC = gcc
+CFLAGS = -std=gnu99 -O3 -Wall -DNUM_STEPS=100 -DNUM_TILES=2 -DPC_PLATFORM -pthread
+
+life.o: life.c life.h utility.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+utility.o: utility.c life.h utility.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+life: life.o utility.o
+	$(CC) $(LDFLAGS) life.o utility.o -pthread -o $@ 
+
+clean:
+	\rm life *~ *.o
+	
